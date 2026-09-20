@@ -8,11 +8,13 @@
 <p>Native-like biometric payment for WeChat, via LSPosed</p>
 
 [![Release](https://img.shields.io/github/v/release/kiriashi/BioPay?style=flat)](https://github.com/kiriashi/BioPay/releases)
-[![CI](https://github.com/kiriashi/BioPay/actions/workflows/ci.yml/badge.svg)](https://github.com/kiriashi/BioPay/actions)
+[![Stars](https://img.shields.io/github/stars/kiriashi/BioPay?style=flat)](https://github.com/kiriashi/BioPay/stargazers)
+[![Downloads](https://img.shields.io/github/downloads/kiriashi/BioPay/total?style=flat)](https://github.com/kiriashi/BioPay/releases)
 [![License](https://img.shields.io/github/license/kiriashi/BioPay?style=flat)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-9.0%2B-green.svg?style=flat)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-purple.svg?style=flat)](https://kotlinlang.org)
 [![LSPosed](https://img.shields.io/badge/LSPosed-API%20102-purple.svg?style=flat)](https://github.com/LSPosed/LSPosed)
+[![Telegram](https://img.shields.io/badge/Telegram-交流群-blue.svg?style=flat)](https://t.me/biopaychat)
 
 [简体中文](README.md) | [English](README_EN.md)
 
@@ -119,7 +121,7 @@
 
 ## 适配与反馈
 
-微信改版若导致失效，请带上微信版本号、Android 版本、LSPosed 版本提 issue。请仅在你有权修改的设备与账号上使用本模块。
+微信改版若导致失效，请带上微信版本号、Android 版本、LSPosed 版本提 issue，也欢迎加入 [Telegram 交流群](https://t.me/biopaychat)反馈交流。请仅在你有权修改的设备与账号上使用本模块。
 
 ## 后续计划（TODO）
 

@@ -8,11 +8,13 @@
 <p>Native-like biometric payment for WeChat, via LSPosed</p>
 
 [![Release](https://img.shields.io/github/v/release/kiriashi/BioPay?style=flat)](https://github.com/kiriashi/BioPay/releases)
-[![CI](https://github.com/kiriashi/BioPay/actions/workflows/ci.yml/badge.svg)](https://github.com/kiriashi/BioPay/actions)
+[![Stars](https://img.shields.io/github/stars/kiriashi/BioPay?style=flat)](https://github.com/kiriashi/BioPay/stargazers)
+[![Downloads](https://img.shields.io/github/downloads/kiriashi/BioPay/total?style=flat)](https://github.com/kiriashi/BioPay/releases)
 [![License](https://img.shields.io/github/license/kiriashi/BioPay?style=flat)](LICENSE)
 [![Android](https://img.shields.io/badge/Android-9.0%2B-green.svg?style=flat)](https://developer.android.com)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1-purple.svg?style=flat)](https://kotlinlang.org)
 [![LSPosed](https://img.shields.io/badge/LSPosed-API%20102-purple.svg?style=flat)](https://github.com/LSPosed/LSPosed)
+[![Telegram](https://img.shields.io/badge/Telegram-交流群-blue.svg?style=flat)](https://t.me/biopaychat)
 
 [简体中文](README.md) | [English](README_EN.md)
 
@@ -153,7 +155,8 @@ Requirements: Android 9.0+, with fingerprint or face enrolled on the device.
 ## Compatibility & Feedback
 
 If a WeChat update breaks the module, please file an issue with the WeChat
-version, Android version and LSPosed version. Only use this module on
+version, Android version and LSPosed version, or join the
+[Telegram group](https://t.me/biopaychat). Only use this module on
 devices and accounts you are authorized to modify.
 
 ## Roadmap (TODO)
