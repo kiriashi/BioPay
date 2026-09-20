@@ -1,0 +1,138 @@
+name: Release
+
+# Version-driven auto release (idea borrowed from LocationSpoofer):
+# bump versionName in app/build.gradle.kts and push to main, and this
+# workflow tags and publishes the release by itself.
+# Tag format follows the GitHub common standard: v<versionName>
+# (e.g. v1.0.0). Store-specific naming is handled separately.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check version status
+        id: check_version
+        run: |
+          NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -n 1)
+          test -n "$NAME" || { echo "error: versionName not found"; exit 1; }
+          echo "Version: $NAME"
+          if ! echo "$NAME" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Version '$NAME' is not a stable x.y.z release, skipping."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          TAG="v$NAME"
+          if git ls-remote --tags origin "refs/tags/$TAG" | grep -qE "refs/tags/$TAG(\^\{\})?$"; then
+            echo "Tag $TAG already released, nothing to do."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "New unreleased version: $TAG"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version_name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog
+        if: steps.check_version.outputs.changed == 'true'
+        run: |
+          TAG="${{ steps.check_version.outputs.tag }}"
+          PREV_TAG=$(git tag -l --sort=-v:refname | grep -vx "$TAG" | head -n 1 || echo "")
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --no-merges --pretty=format:"%s")
+          else
+            echo "Previous tag: $PREV_TAG"
+            COMMITS=$(git log "$PREV_TAG"..HEAD --no-merges --pretty=format:"%s")
+          fi
+          echo "" > changelog.txt
+          FEATS=$(echo "$COMMITS" | grep "^feat:" | sed 's/^feat:[[:space:]]*/- /' || true)
+          FIXES=$(echo "$COMMITS" | grep "^fix:" | sed 's/^fix:[[:space:]]*/- /' || true)
+          if [ -n "$FEATS" ]; then printf "## 功能\n%s\n\n" "$FEATS" >> changelog.txt; fi
+          if [ -n "$FIXES" ]; then printf "## 修复\n%s\n\n" "$FIXES" >> changelog.txt; fi
+          if [ -z "$FEATS" ] && [ -z "$FIXES" ]; then echo "常规更新与优化" >> changelog.txt; fi
+          cat changelog.txt
+
+      - name: Set up Java
+        if: steps.check_version.outputs.changed == 'true'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Make Gradle executable
+        if: steps.check_version.outputs.changed == 'true'
+        run: chmod +x gradlew
+
+      - name: Restore signing keystore
+        if: steps.check_version.outputs.changed == 'true'
+        env:
+          BIOPAY_RELEASE_KEYSTORE_BASE64: ${{ secrets.BIOPAY_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$BIOPAY_RELEASE_KEYSTORE_BASE64"
+          printf '%s' "$BIOPAY_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/biopay-release.keystore"
+
+      - name: Build release and debug APKs
+        if: steps.check_version.outputs.changed == 'true'
+        env:
+          BIOPAY_RELEASE_STORE_FILE: ${{ runner.temp }}/biopay-release.keystore
+          BIOPAY_RELEASE_STORE_PASSWORD: ${{ secrets.BIOPAY_RELEASE_STORE_PASSWORD }}
+          BIOPAY_RELEASE_KEY_ALIAS: ${{ secrets.BIOPAY_RELEASE_KEY_ALIAS }}
+          BIOPAY_RELEASE_KEY_PASSWORD: ${{ secrets.BIOPAY_RELEASE_KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease assembleDebug
+          APK_DIR="app/build/outputs/apk"
+          mv "$APK_DIR/release/app-release.apk" "$APK_DIR/BioPay-${{ steps.check_version.outputs.tag }}.apk"
+          mv "$APK_DIR/debug/app-debug.apk" "$APK_DIR/BioPay-${{ steps.check_version.outputs.tag }}-debug.apk"
+          ls -lh "$APK_DIR"
+
+      - name: Verify release APK
+        if: steps.check_version.outputs.changed == 'true'
+        run: |
+          APK=app/build/outputs/apk/BioPay-${{ steps.check_version.outputs.tag }}.apk
+          test -s "$APK"
+          # Not debuggable.
+          ! unzip -p "$APK" AndroidManifest.xml | strings | grep -q 'debuggable'
+          # Xposed entry must survive R8/shrinking with its real name.
+          ENTRY=$(python3 -c "import zipfile,sys; print(zipfile.ZipFile(sys.argv[1]).read('META-INF/xposed/java_init.list').decode().strip())" "$APK")
+          echo "Entry: $ENTRY"
+          test "$ENTRY" = "io.github.kiriashi.biopay.entry.BioPayModule"
+          # Signature valid.
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
+          "$APKSIGNER" verify "$APK"
+
+      - name: Upload release mapping (private)
+        if: steps.check_version.outputs.changed == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-mapping-${{ steps.check_version.outputs.tag }}
+          if-no-files-found: error
+          retention-days: 90
+          path: app/build/outputs/mapping/release/mapping.txt
+
+      - name: Publish GitHub Release
+        if: steps.check_version.outputs.changed == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.check_version.outputs.tag }}
+          name: BioPay ${{ steps.check_version.outputs.tag }}
+          body_path: changelog.txt
+          files: |
+            app/build/outputs/apk/BioPay-${{ steps.check_version.outputs.tag }}.apk
+            app/build/outputs/apk/BioPay-${{ steps.check_version.outputs.tag }}-debug.apk

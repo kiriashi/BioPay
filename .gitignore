@@ -1,0 +1,64 @@
+# Built application files
+*.apk
+*.aar
+*.ap_
+*.aab
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+release/
+
+# Gradle files
+.gradle/
+build/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Signing files
+*.keystore
+*.jks
+keystore.properties
+
+# Android Studio
+.idea/
+*.iml
+*.iws
+*.ipr
+.navigation/
+captures/
+
+# Keystore files
+fingerpay.keystore
+keystore_base64.txt
+
+# Log files
+*.log
+
+# Crash dumps and profiling snapshots
+*.hprof
+
+# Environment and secret files
+.env
+.env.*
+*.pem
+*.p12
+*.pfx
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Kotlin
+.kotlin/
+
+# Proguard
+proguard/

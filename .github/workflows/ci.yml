@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v5
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Make Gradle executable
+        run: chmod +x gradlew
+
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Run Lint
+        run: ./gradlew lintDebug
+
+      - name: Assemble debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ci-reports
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            app/build/reports/
+            app/build/test-results/
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: biopay-debug-apk
+          if-no-files-found: error
+          retention-days: 7
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+  # Rebuilds the exact release pipeline (R8, ProGuard rules, shrinking) on
+  # every push using an ephemeral throwaway key. Catches issues like
+  # entry-point obfuscation that debug builds can never reveal.
+  release-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Make Gradle executable
+        run: chmod +x gradlew
+
+      - name: Generate ephemeral signing key
+        run: |
+          keytool -genkeypair -noprompt \
+            -keystore "$RUNNER_TEMP/ci-release.keystore" \
+            -alias biopay-ci -storepass ci-release -keypass ci-release \
+            -keyalg RSA -keysize 2048 -validity 30 \
+            -dname "CN=BioPay CI Ephemeral, OU=CI, O=BioPay, C=CN"
+
+      - name: Assemble release APK
+        env:
+          BIOPAY_RELEASE_STORE_FILE: ${{ runner.temp }}/ci-release.keystore
+          BIOPAY_RELEASE_STORE_PASSWORD: ci-release
+          BIOPAY_RELEASE_KEY_ALIAS: biopay-ci
+          BIOPAY_RELEASE_KEY_PASSWORD: ci-release
+        run: ./gradlew assembleRelease
+
+      - name: Verify Xposed entry survived shrinking
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          ENTRY=$(python3 -c "import zipfile,sys; print(zipfile.ZipFile(sys.argv[1]).read('META-INF/xposed/java_init.list').decode().strip())" "$APK")
+          echo "Entry: $ENTRY"
+          test "$ENTRY" = "io.github.kiriashi.biopay.entry.BioPayModule"
+          test -s app/build/outputs/mapping/release/mapping.txt
+
+      - name: Upload release mapping
+        uses: actions/upload-artifact@v6
+        with:
+          name: ci-release-mapping
+          if-no-files-found: error
+          retention-days: 7
+          path: app/build/outputs/mapping/release/mapping.txt
